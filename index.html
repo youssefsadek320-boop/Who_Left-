@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mutuals Cleaner | صفي حسابك</title>
+    <style>
+        :root {
+            --bg-color: #0b0c10;
+            --card-bg: #1f2833;
+            --neon-pink: #ff007f;
+            --neon-cyan: #00f0ff;
+            --text-color: #c5c6c7;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: #fff;
+            text-shadow: 0 0 10px var(--neon-pink), 0 0 20px var(--neon-pink);
+            font-size: 2.5rem;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            color: var(--neon-cyan);
+            margin-bottom: 30px;
+            font-weight: bold;
+        }
+
+        #dropzone {
+            border: 2px dashed var(--neon-cyan);
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            width: 80%;
+            max-width: 500px;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+            transition: 0.3s;
+        }
+
+        #dropzone:hover {
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.5);
+            transform: scale(1.02);
+        }
+
+        #fileInput { display: none; }
+
+        .results-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            width: 90%;
+            max-width: 1000px;
+            margin-top: 30px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 20px;
+            border-top: 4px solid var(--neon-pink);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        .card.cyan { border-top-color: var(--neon-cyan); }
+
+        .card h3 {
+            margin-top: 0;
+            color: #fff;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .badge {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        li {
+            padding: 8px 5px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        li a {
+            color: var(--neon-cyan);
+            text-decoration: none;
+            font-size: 0.85rem;
+        }
+
+        li a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+    <h1>MUTUALS CLEANER</h1>
+    <div class="subtitle">صفي حسابك واعرف مين خلع من الـ Follow Back</div>
+
+    <div id="dropzone">
+        <p>اسحب وارمي ملف الـ JSON هنا (followers_and_following.json)</p>
+        <p style="font-size: 0.8rem; color: #666;">أو اضغط لاختيار الملف من جهازك</p>
+        <input type="file" id="fileInput" accept=".json">
+    </div>
+
+    <div class="results-container" id="results" style="display: none;">
+        <!-- كارت الخائنين -->
+        <div class="card">
+            <h3>مش عاملين فولو باك <span class="badge" id="count-backstabbers">0</span></h3>
+            <ul id="list-backstabbers"></ul>
+        </div>
+
+        <!-- كارت الفانز -->
+        <div class="card cyan">
+            <h3>فانز (أنت مش عاملهم فولو) <span class="badge" id="count-fans">0</span></h3>
+            <ul id="list-fans"></ul>
+        </div>
+    </div>
+
+    <script>
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const resultsContainer = document.getElementById('results');
+
+        dropzone.addEventListener('click', () => fileInput.click());
+
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.style.borderColor = 'var(--neon-pink)';
+        });
+
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.style.borderColor = 'var(--neon-cyan)';
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.style.borderColor = 'var(--neon-cyan)';
+            const file = e.dataTransfer.files[0];
+            if (file && file.type === "application/json") {
+                processFile(file);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) processFile(file);
+        });
+
+        function processFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const data = JSON.parse(event.target.result);
+                    analyzeData(data);
+                } catch (error) {
+                    alert("الملف ده مش JSON مظبوط، اتأكد إنك منزله صح من إنستجرام.");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function analyzeData(data) {
+            // استخراج الـ Followers والـ Following بناءً على هيكل ملفات إنستجرام الحالية
+            let followers = [];
+            let following = [];
+
+            if (data.string_list_data) {
+                // لو ملف فردي
+                alert("يرجى رفع ملف الحزمة الكامل الصادر من إنستجرام أو التأكد من دمج البيانات");
+                return;
+            }
+
+            // محاولة قراءة الهيكل الافتراضي لإنستجرام
+            try {
+                // استخراج الـ following
+                const followingList = data.relationships_following || data;
+                if(Array.isArray(followingList)) {
+                    following = followingList.map(item => item.string_list_data[0].value);
+                }
+                
+                // استخراج الـ followers
+                const followersList = data.relationships_followers;
+                if(Array.isArray(followersList)) {
+                    followers = followersList.map(item => item.string_list_data[0].value);
+                }
+            } catch(e) {
+                // لو الهيكل مختلف (تحديثات إنستجرام)
+                console.log("حاول قراءة صيغة بديلة");
+            }
+
+            // لو البيانات مندمجة في كائن واحد (شكل مبسط للتجربة)
+            if(data.followers && data.following) {
+                followers = data.followers;
+                following = data.following;
+            }
+
+            // الـ Logic البيور للمقارنة
+            // 1. ناس أنت عاملهم فولو وهم مش عاملينه ليك (Backstabbers)
+            const backstabbers = following.filter(user => !followers.includes(user));
+            
+            // 2. ناس عاملة لك فولو وأنت منفض لهم (Fans)
+            const fans = followers.filter(user => !following.includes(user));
+
+            // عرض النتائج في الواجهة
+            displayList('list-backstabbers', 'count-backstabbers', backstabbers);
+            displayList('list-fans', 'count-fans', fans);
+
+            resultsContainer.style.display = 'grid';
+        }
+
+        function displayList(listId, countId, array) {
+            const listElement = document.getElementById(listId);
+            const countElement = document.getElementById(countId);
+            
+            listElement.innerHTML = '';
+            countElement.innerText = array.length;
+
+            if(array.length === 0) {
+                listElement.innerHTML = '<li>كل تمام هنا! ✨</li>';
+                return;
+            }
+
+            array.forEach(username => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <span>@${username}</span>
+                    <a href="https://instagram.com/${username}" target="_blank">بروفايل ↗</a>
+                `;
+                listElement.appendChild(li);
+            });
+        }
+    </script>
+</body>
+</html>
